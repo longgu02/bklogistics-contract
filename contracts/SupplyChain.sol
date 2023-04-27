@@ -5,10 +5,10 @@ pragma solidity >=0.7.0 <0.9.0;
 import "./Role.sol";
 import "./Product.sol";
 import "./utils/Utils.sol";
+// import "@openzeppelin/contracts/access/AccessControl.sol";
 
-contract SupplyChain {
+contract SupplyChain is Role {
 
-  Roles roleContract; 
   Products private productContract; 
   Utils private utilityContract;
   address private admin;
@@ -30,21 +30,21 @@ contract SupplyChain {
     address[] suppliers; // Supplier address
     address[] manufacturers; // Manufacturer address
     uint256 createdDate; // Order created date
-    uint256[] supplyPrice; // Money supplier received after finish the order
-    uint256[] manufacturePrice; // Money supplier received after finish the order
+    mapping (address => uint) price; // Money stakeholders received after finish the order
     OrderStatus status; // Order's status
     bool paidStatus; // Payment status
 
   }
 
-  Order[] public orderList;
+  mapping(uint => Order) orderList;
+  uint orderCounter;
 
-  constructor(address _roleContract, address _productContract, address _utilityContract){
-    roleContract = Roles(_roleContract);
+  constructor(address _productContract, address _utilityContract){
     productContract = Products(_productContract);
     utilityContract = Utils(_utilityContract);
     // admin for maintenance if needed (Based on government)
     admin = msg.sender;
+    orderCounter = 1;
   }
 
   modifier onlyStockHolders(uint256 _orderId){
@@ -53,15 +53,15 @@ contract SupplyChain {
     _;
   }
 
-  modifier onlyCustomer{
-    require(roleContract.hasRole(msg.sender) == Roles.RoleType.CUSTOMER, "You are not customer");
-    _;
-  }
+  // modifier onlyCustomer{
+  //   require(hasRole() == CUSTOMER_ROLE, "You are not customer");
+  //   _;
+  // }
 
 // Customer can create an order with certain informations
-function createOrder(uint256 _productId, address _customer, address[] memory _supplier, address[] memory _manufacturer, uint[] memory _supplyPrice, uint[] memory _manufacturePrice) onlyCustomer public {
+function createOrder(uint256 _productId, address _customer, address[] memory _supplier, address[] memory _manufacturer, uint[] memory _supplyPrice, uint[] memory _manufacturePrice) onlyRole(CUSTOMER_ROLE) public {
     Order memory newOrder = Order({
-        id : orderList.length + 1,
+        id : orderCounter,
         productId: _productId,
         customer : _customer,
         suppliers : _supplier,
@@ -72,7 +72,8 @@ function createOrder(uint256 _productId, address _customer, address[] memory _su
         status : OrderStatus.PENDING,
         paidStatus : false
     });
-    orderList.push(newOrder);
+      orderList[orderCounter] = newOrder;
+      orderCounter++;
 }
 
  /**
@@ -86,31 +87,31 @@ function createOrder(uint256 _productId, address _customer, address[] memory _su
   * Any other order is not allowed
   */ 
   function confirmOrder(uint256 _orderId) onlyStockHolders(_orderId) public{
-    Roles.RoleType role = roleContract.hasRole(msg.sender);
+    require(_orderId <= orderCounter, "Order ID is not valid");
     // Status changed corresponding to caller role
-    if(role == Roles.RoleType.SUPPILER){
-      require(orderList[_orderId].status == OrderStatus.PENDING, "Order is not pending");
+    if(hasRole(SUPPLIER_ROLE ,msg.sender)){
+      require(orderList[_orderId].status == OrderStatus.PENDING, "Order is not currently pending");
       orderList[_orderId].status = OrderStatus.SUPPLIED;
-    }else if(role == Roles.RoleType.MANUFACTURER){
-      require(orderList[_orderId].status == OrderStatus.SUPPLIED, "Order is not supplied");
+    }else if(hasRole(MANUFACTURER_ROLE ,msg.sender)){
+      require(orderList[_orderId].status == OrderStatus.SUPPLIED, "Order has not supplied");
       orderList[_orderId].status = OrderStatus.DELIVERING;
-    }else if(role == Roles.RoleType.CUSTOMER){
-      require(orderList[_orderId].status == OrderStatus.DELIVERING, "Order is not delivering");
+    }else if(hasRole(CUSTOMER_ROLE ,msg.sender)){
+      require(orderList[_orderId].status == OrderStatus.DELIVERING, "Order has not delivering");
       orderList[_orderId].status = OrderStatus.SUCCESS;
     }
   }
 
   // Get order by orderId
   function viewOrder(uint _orderId) public view returns (Order memory) {
-    Order memory matchedOrder = orderList[_orderId - 1];
+    require(_orderId <= orderCounter, "Order ID is not valid");
+    Order memory matchedOrder = orderList[_orderId];
     return matchedOrder;
   }
 
   // Cancel the order
-  function cancelOrder(uint _orderId) public returns (bool) {
-    require(_orderId < orderList.length && orderList[_orderId - 1].status != OrderStatus.FAILED, "Order is not valid");
-    orderList[_orderId - 1].status = OrderStatus.CANCELLED;
-    return true;
+  function cancelOrder(uint _orderId) public {
+    require(_orderId <= orderCounter && orderList[_orderId].status != OrderStatus.FAILED, "Order is not valid");
+    orderList[_orderId].status = OrderStatus.CANCELLED;
   }
 
 }

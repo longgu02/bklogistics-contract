@@ -2,54 +2,18 @@
 
 pragma solidity >=0.7.0 <0.9.0;
 
-contract Roles {
-    /**
-     * Included 3 Roles:
-     * - Supplier
-     * - Manufacturer
-     * - Contributor or Retailer (as Customer)
-     */
-    enum RoleType {
-        NONE, // default
-        SUPPILER,
-        MANUFACTURER,
-        CUSTOMER
-    }
-    address[] members; // Members list for counting
-    mapping(address => RoleType) internal bearer; // Members's address that bear the role.
+import "node_modules/@openzeppelin/contracts/access/AccessControl.sol";
 
-    // add role to members
-    function addMember(address _address, RoleType role) public {
-      // Members need to have default role to be added
-        require(hasRole(_address) == RoleType.NONE, "You already have role");
-        bearer[_address] = role;
-        members.push(_address);
-    }
+contract Roles is AccessControl {
+    bytes32 public constant SUPPLIER_ROLE = keccak256("SUPPLIER");
+    bytes32 public constant MANUFACTURER_ROLE = keccak256("MANUFACTURER");
+    bytes32 public constant CUSTOMER_ROLE = keccak256("CUSTOMER");
+    bytes32 public constant ADMIN_ROLE = keccak256("ADMIN");
 
-    // Remove role from members (set role to default)
-    function removeMember(address _address) public {
-      // Member need to have role (not default)
-        require(hasRole(_address) != RoleType.NONE, "Not a member");
-        bearer[_address] = RoleType.NONE;
-    }
-
-    // Check for role of a member
-    function hasRole(address _address) public view returns (RoleType) {
-        return bearer[_address];
-    }
-
-    // Get all member's address with specific role
-    function getMembersWithRole(
-        RoleType role
-    ) public view returns (address[] memory) {
-        address[] memory result = new address[](members.length);
-        uint256 counter = 0;
-        for (uint256 i = 0; i < members.length; i++) {
-            if (bearer[members[i]] == role) {
-                result[counter] = members[i];
-                counter++;
-            }
-        }
-        return result;
+    constructor(){
+        _setupRole(ADMIN_ROLE, msg.sender);
+        _setRoleAdmin(SUPPLIER_ROLE, ADMIN_ROLE);
+        _setRoleAdmin(MANUFACTURER_ROLE, ADMIN_ROLE);
+        _setRoleAdmin(CUSTOMER_ROLE, ADMIN_ROLE);
     }
 }
