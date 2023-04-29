@@ -2,13 +2,12 @@
 
 pragma solidity >=0.7.0 <0.9.0;
 
-import "./Role.sol";
+import "./Roles.sol";
 import "./Product.sol";
 import "./utils/Utils.sol";
-// import "@openzeppelin/contracts/access/AccessControl.sol";
 
-contract SupplyChain is Role {
-
+contract SupplyChain {
+  Roles private roleContract;
   Products private productContract; 
   Utils private utilityContract;
   address private admin;
@@ -39,7 +38,8 @@ contract SupplyChain is Role {
   mapping(uint => Order) orderList;
   uint orderCounter;
 
-  constructor(address _productContract, address _utilityContract){
+  constructor(address _roleContract ,address _productContract, address _utilityContract){
+    roleContract = Roles(_roleContract);
     productContract = Products(_productContract);
     utilityContract = Utils(_utilityContract);
     // admin for maintenance if needed (Based on government)
@@ -47,19 +47,19 @@ contract SupplyChain is Role {
     orderCounter = 1;
   }
 
-  modifier onlyStockHolders(uint256 _orderId){
+  modifier onlyStakeHolders(uint256 _orderId){
     Order memory matchedOrder = orderList[_orderId];
     require(utilityContract.isStakeHolder(matchedOrder.suppliers, matchedOrder.manufacturers, matchedOrder.customer, msg.sender), "You are not stakeholder of this order");
     _;
   }
 
   // modifier onlyCustomer{
-  //   require(hasRole() == CUSTOMER_ROLE, "You are not customer");
+  //   require(roleContract.hasRole() == CUSTOMER_ROLE, "You are not customer");
   //   _;
   // }
 
 // Customer can create an order with certain informations
-function createOrder(uint256 _productId, address _customer, address[] memory _supplier, address[] memory _manufacturer, uint[] memory _supplyPrice, uint[] memory _manufacturePrice) onlyRole(CUSTOMER_ROLE) public {
+function createOrder(uint256 _productId, address _customer, address[] memory _supplier, address[] memory _manufacturer, uint[] memory _supplyPrice, uint[] memory _manufacturePrice) roleContract.onlyRole(CUSTOMER_ROLE) public {
     Order memory newOrder = Order({
         id : orderCounter,
         productId: _productId,
@@ -78,24 +78,27 @@ function createOrder(uint256 _productId, address _customer, address[] memory _su
 
  /**
   * Order confirmation step:
+  * 
   * - Each role confirm the order will change its status to a certain type 
   * that corresponding to the "Work has been done" to each role
+  * 
   *   + Supplier -> Change "pending" to "supplied"
   *   + Manufacturer -> Change "supplied" to "delivering"
   *   + Customer -> Change "delivering" to "success"
+  * 
   * Note: The confirmation must follow the confirming order of supply chain: Supplier -> Manufacturer -> Customer
   * Any other order is not allowed
   */ 
-  function confirmOrder(uint256 _orderId) onlyStockHolders(_orderId) public{
+  function confirmOrder(uint256 _orderId) onlyStakeHolders(_orderId) public{
     require(_orderId <= orderCounter, "Order ID is not valid");
     // Status changed corresponding to caller role
-    if(hasRole(SUPPLIER_ROLE ,msg.sender)){
+    if(roleContract.hasRole(SUPPLIER_ROLE ,msg.sender)){
       require(orderList[_orderId].status == OrderStatus.PENDING, "Order is not currently pending");
       orderList[_orderId].status = OrderStatus.SUPPLIED;
-    }else if(hasRole(MANUFACTURER_ROLE ,msg.sender)){
+    }else if(roleContract.hasRole(MANUFACTURER_ROLE ,msg.sender)){
       require(orderList[_orderId].status == OrderStatus.SUPPLIED, "Order has not supplied");
       orderList[_orderId].status = OrderStatus.DELIVERING;
-    }else if(hasRole(CUSTOMER_ROLE ,msg.sender)){
+    }else if(roleContract.hasRole(CUSTOMER_ROLE ,msg.sender)){
       require(orderList[_orderId].status == OrderStatus.DELIVERING, "Order has not delivering");
       orderList[_orderId].status = OrderStatus.SUCCESS;
     }
