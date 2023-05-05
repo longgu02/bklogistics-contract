@@ -15,7 +15,7 @@ contract Roles is AccessControl {
     bytes32 public constant CUSTOMER_ROLE = keccak256("CUSTOMER");
     bytes32 public constant ADMIN_ROLE = keccak256("ADMIN");
 
-    constructor(){
+    constructor() {
         // The deployer of the contract is given the admin role
         _setupRole(ADMIN_ROLE, msg.sender);
         // The admin role is set as the role admin for each of the other roles

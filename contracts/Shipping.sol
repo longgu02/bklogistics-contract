@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.0;
 
-import "node_modules/@openzeppelin/contracts/access/AccessControl.sol";
+import "@openzeppelin/contracts/access/AccessControl.sol";
 
 contract Shipping is AccessControl {
     /**
@@ -17,7 +17,7 @@ contract Shipping is AccessControl {
         IN_PROGRESS,
         DELIVERED
     }
-    
+
     /**
      * @dev Struct representing a shipment.
      * @param id Unique identifier for the shipment.
@@ -100,14 +100,14 @@ contract Shipping is AccessControl {
     function addCarrier(address _account) public onlyRole(ADMIN_ROLE) {
         grantRole(CARRIER_ROLE, _account);
     }
-    
+
     /**
      * @dev Renounce the CARRIER_ROLE to a specified account.
      * @param _account Address of the account to renounce the CARRIER_ROLE to.
      * Can only be called by accounts with the CARRIER_ROLE.
      */
-    function renounceCarrier(address _account) public onlyRole(CARRIER_ROLE){
-        renounceRole(CARRIER_ROLE, _account)
+    function renounceCarrier(address _account) public onlyRole(CARRIER_ROLE) {
+        renounceRole(CARRIER_ROLE, _account);
     }
 
     /**

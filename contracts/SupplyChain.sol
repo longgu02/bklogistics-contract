@@ -21,6 +21,47 @@ contract SupplyChain is Roles {
         CANCELLED // Order cancelled
     }
 
+    mapping(bytes32 => StatusAllowed) private _roleUpdatePermission;
+
+    struct StatusAllowed {
+        OrderStatus statusSet;
+        OrderStatus prevStatus;
+    }
+
+    event OrderCreated(
+        uint256 id,
+        uint256 productId,
+        address customer,
+        address[] suppliers,
+        address[] manufacturers,
+        uint256 createdDate,
+        address creator
+    );
+
+    event OrderCancelled(
+        uint id,
+        address cancelledAddress,
+        OrderStatus prevStatus,
+        uint256 cancelledDate
+    );
+
+    event OrderUpdated(
+        uint id,
+        address updatedAddress,
+        bytes32 role,
+        OrderStatus prevStatus,
+        OrderStatus curStatus,
+        uint256 updatedDate
+    );
+
+    event OrderPaid(
+        uint id,
+        address payer,
+        address[] receivers,
+        uint256[] amount,
+        uint256 paymentDate
+    );
+
     struct OrderPayment {
         mapping(address => uint) price; // Money stakeholders received after finish the order
     }
@@ -50,6 +91,18 @@ contract SupplyChain is Roles {
         utilityContract = Utils(_utilityContract);
         // admin for maintenance if needed (Based on government)
         admin = msg.sender;
+        _roleUpdatePermission[SUPPLIER_ROLE] = StatusAllowed(
+            OrderStatus.SUPPLIED,
+            OrderStatus.PENDING
+        );
+        _roleUpdatePermission[MANUFACTURER_ROLE] = StatusAllowed(
+            OrderStatus.DELIVERING,
+            OrderStatus.SUPPLIED
+        );
+        _roleUpdatePermission[CUSTOMER_ROLE] = StatusAllowed(
+            OrderStatus.SUCCESS,
+            OrderStatus.DELIVERING
+        );
         orderCounter = 1;
     }
 
@@ -97,7 +150,15 @@ contract SupplyChain is Roles {
             status: OrderStatus.PENDING,
             paidStatus: false
         });
-
+        emit OrderCreated(
+            newOrder.id,
+            newOrder.productId,
+            newOrder.customer,
+            newOrder.suppliers,
+            newOrder.manufacturers,
+            block.timestamp,
+            msg.sender
+        );
         orderList[orderCounter] = newOrder;
         orderCounter++;
     }
@@ -127,28 +188,46 @@ contract SupplyChain is Roles {
      * Note: The confirmation must follow the confirming order of supply chain: Supplier -> Manufacturer -> Customer
      * Any other order is not allowed
      */
-    function confirmOrder(uint256 _orderId) public onlyStakeHolder(_orderId) {
+    function confirmOrder(
+        uint256 _orderId,
+        bytes32 _role
+    ) public onlyStakeHolder(_orderId) {
+        require(roleContract.hasRole(_role, msg.sender), "Role not granted");
         require(_orderId <= orderCounter, "Order ID is not valid");
         // Status changed corresponding to caller role
-        if (roleContract.hasRole(SUPPLIER_ROLE, msg.sender)) {
-            require(
-                orderList[_orderId].status == OrderStatus.PENDING,
-                "Order is not currently pending"
-            );
-            orderList[_orderId].status = OrderStatus.SUPPLIED;
-        } else if (roleContract.hasRole(MANUFACTURER_ROLE, msg.sender)) {
-            require(
-                orderList[_orderId].status == OrderStatus.SUPPLIED,
-                "Order has not supplied"
-            );
-            orderList[_orderId].status = OrderStatus.DELIVERING;
-        } else if (roleContract.hasRole(CUSTOMER_ROLE, msg.sender)) {
-            require(
-                orderList[_orderId].status == OrderStatus.DELIVERING,
-                "Order has not delivering"
-            );
-            orderList[_orderId].status = OrderStatus.SUCCESS;
-        }
+        require(
+            _roleUpdatePermission[_role].prevStatus ==
+                orderList[_orderId].status,
+            "Current order status is not valid"
+        );
+        orderList[_orderId].status = _roleUpdatePermission[_role].statusSet;
+        emit OrderUpdated(
+            _orderId,
+            msg.sender,
+            _role,
+            _roleUpdatePermission[_role].prevStatus,
+            _roleUpdatePermission[_role].statusSet,
+            block.timestamp
+        );
+        // if (roleContract.hasRole(SUPPLIER_ROLE, msg.sender)) {
+        //     require(
+        //         orderList[_orderId].status == OrderStatus.PENDING,
+        //         "Order is not currently pending"
+        //     );
+        //     orderList[_orderId].status = OrderStatus.SUPPLIED;
+        // } else if (roleContract.hasRole(MANUFACTURER_ROLE, msg.sender)) {
+        //     require(
+        //         orderList[_orderId].status == OrderStatus.SUPPLIED,
+        //         "Order has not supplied"
+        //     );
+        //     orderList[_orderId].status = OrderStatus.DELIVERING;
+        // } else if (roleContract.hasRole(CUSTOMER_ROLE, msg.sender)) {
+        //     require(
+        //         orderList[_orderId].status == OrderStatus.DELIVERING,
+        //         "Order has not delivering"
+        //     );
+        //     orderList[_orderId].status = OrderStatus.SUCCESS;
+        // }
     }
 
     // Get order by orderId
@@ -162,9 +241,11 @@ contract SupplyChain is Roles {
     function cancelOrder(uint _orderId) public {
         require(
             _orderId <= orderCounter &&
-                orderList[_orderId].status != OrderStatus.FAILED,
+                orderList[_orderId].status != OrderStatus.SUCCESS,
             "Order is not valid"
         );
+        OrderStatus prevStatus = orderList[_orderId].status;
         orderList[_orderId].status = OrderStatus.CANCELLED;
+        emit OrderCancelled(_orderId, msg.sender, prevStatus, block.timestamp);
     }
 }

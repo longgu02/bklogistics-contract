@@ -4,11 +4,6 @@ pragma solidity >=0.7.0 <0.9.0;
 import "./Roles.sol";
 
 contract Products {
-    /**
-     * @title Products
-     * @dev This contract allows the creation, retrieval, update and deletion of products in a supply chain management system.
-     */
-
     Roles private roleContract;
 
     struct Product {
@@ -33,18 +28,11 @@ contract Products {
     /**
      * @dev Adds a new product to the system.
      * @param _name Name of the new product.
-     * @param _price Price of the new product.
-     * @param _quantity Quantity of the new product.
      */
 
     function addProduct(
-        string memory _name,
-        uint _price,
-        uint _quantity
+        string memory _name
     ) public {
-        require(_price > 0, "Price must be greater than 0");
-        require(_quantity > 0, "Quantity must be greater than 0");
-
         // Check if product with the same name already exists
         for (uint i = 0; i < productCounter; i++) {
             if (keccak256(bytes(products[i].name)) == keccak256(bytes(_name))) {
@@ -55,9 +43,7 @@ contract Products {
         // Add new product
         Product memory newProduct = Product(
             productCounter,
-            _name,
-            _price,
-            _quantity
+            _name
         );
         products[productCounter] = newProduct;
         productCounter++;
@@ -83,15 +69,11 @@ contract Products {
      * @dev Updates the details of a product given the product ID.
      * @param _productId ID of the product to be updated.
      * @param _name New name of the product.
-     * @param _price New price of the product.
-     * @param _quantity New quantity of the product.
      */
 
     function updateProduct(
         uint256 _productId,
-        string memory _name,
-        uint256 _price,
-        uint256 _quantity
+        string memory _name
     ) public {
         require(
             _productId > 0 && _productId <= productCounter,
@@ -99,8 +81,6 @@ contract Products {
         );
         Product storage product = products[_productId - 1];
         product.name = _name;
-        product.price = _price;
-        product.quantity = _quantity;
     }
 
     /**
@@ -114,5 +94,14 @@ contract Products {
             "Invalid product ID"
         );
         delete products[_productId - 1];
+    }
+
+    function _getProduct(Product[] memory _arr ,uint _productId) pure public returns(Product memory){
+      for(uint i = 0; i < _arr.length; i++){
+        if(_arr[i].productId == _productId) {
+          return _arr[i];
+        }
+      }
+      revert("Product not found");
     }
 }
