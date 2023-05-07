@@ -2,12 +2,10 @@
 pragma solidity ^0.8.0;
 
 import "@openzeppelin/contracts/access/AccessControl.sol";
+import "./Roles.sol";
 
-contract Shipping is AccessControl {
-    /**
-        @title Shipping
-        @dev This contract manages shipments and their status updates.
-    */
+contract Shipping {
+    Roles public roleContract;
 
     /**
      * @dev Enum representing the status of a shipment.
@@ -41,10 +39,21 @@ contract Shipping is AccessControl {
         ShippingStatus status;
     }
 
+    event ShippingOrderCreated(
+        Shipment orderDetails,
+        address creator,
+        uint256 createdDate
+    );
+
+    event ShippingOrderUpdated(
+        Shipment orderDetails,
+        address updater,
+        uint256 updatedDate
+    );
+
     /**
      * @dev Mapping of shipment IDs to Shipment structs.
      */
-
     mapping(uint256 => Shipment) public shipmentList;
 
     /**
@@ -55,9 +64,16 @@ contract Shipping is AccessControl {
     bytes32 public constant CARRIER_ROLE = keccak256("CARRIER_ROLE");
     bytes32 public constant ADMIN_ROLE = keccak256("ADMIN_ROLE");
 
-    constructor() {
-        _setupRole(ADMIN_ROLE, msg.sender);
-        _setRoleAdmin(CARRIER_ROLE, ADMIN_ROLE);
+    modifier onlyRole(bytes32 role) {
+        require(
+            roleContract.hasRole(role, msg.sender),
+            "Caller is not authorized."
+        );
+        _;
+    }
+
+    constructor(address _roleContractAddress) {
+        roleContract = Roles(_roleContractAddress);
         shipmentCounter = 1;
     }
 
@@ -77,7 +93,7 @@ contract Shipping is AccessControl {
         address _carrier,
         address _receiver,
         uint256 _pickupDate
-    ) public onlyRole(CARRIER_ROLE) {
+    ) public onlyRole(roleContract.CARRIER_ROLE()) {
         Shipment memory newShipment = Shipment({
             id: shipmentCounter,
             orderId: _orderId,
@@ -90,24 +106,7 @@ contract Shipping is AccessControl {
         });
         shipmentList[shipmentCounter] = newShipment;
         shipmentCounter++;
-    }
-
-    /**
-     * @dev Grants the CARRIER_ROLE to a specified account.
-     * @param _account Address of the account to grant the CARRIER_ROLE to.
-     * Can only be called by accounts with the ADMIN_ROLE.
-     */
-    function addCarrier(address _account) public onlyRole(ADMIN_ROLE) {
-        grantRole(CARRIER_ROLE, _account);
-    }
-
-    /**
-     * @dev Renounce the CARRIER_ROLE to a specified account.
-     * @param _account Address of the account to renounce the CARRIER_ROLE to.
-     * Can only be called by accounts with the CARRIER_ROLE.
-     */
-    function renounceCarrier(address _account) public onlyRole(CARRIER_ROLE) {
-        renounceRole(CARRIER_ROLE, _account);
+        emit ShippingOrderCreated(newShipment, msg.sender, block.timestamp);
     }
 
     /**
@@ -122,7 +121,7 @@ contract Shipping is AccessControl {
         uint256 _shipmentId,
         uint256 _deliveryDate,
         ShippingStatus _status
-    ) public onlyRole(CARRIER_ROLE) {
+    ) public onlyRole(roleContract.CARRIER_ROLE()) {
         require(_shipmentId < shipmentCounter, "Invalid shipment ID");
         Shipment storage shipment = shipmentList[_shipmentId];
         require(

@@ -21,7 +21,14 @@ contract SupplyChain is Roles {
         CANCELLED // Order cancelled
     }
 
-    mapping(bytes32 => StatusAllowed) private _roleUpdatePermission;
+    enum OrderRole {
+        SUPPLIER,
+        MANUFACTURER,
+        CUSTOMER
+    }
+
+    mapping(OrderRole => StatusAllowed) public confirmPermission;
+    OrderRole[] private initialOrderRole = new OrderRole[](0);
 
     struct StatusAllowed {
         OrderStatus statusSet;
@@ -49,8 +56,6 @@ contract SupplyChain is Roles {
         uint id,
         address updatedAddress,
         bytes32 role,
-        OrderStatus prevStatus,
-        OrderStatus curStatus,
         uint256 updatedDate
     );
 
@@ -91,17 +96,17 @@ contract SupplyChain is Roles {
         utilityContract = Utils(_utilityContract);
         // admin for maintenance if needed (Based on government)
         admin = msg.sender;
-        _roleUpdatePermission[SUPPLIER_ROLE] = StatusAllowed(
+        confirmPermission[OrderRole.CUSTOMER] = StatusAllowed(
+            OrderStatus.SUCCESS,
+            OrderStatus.DELIVERING
+        );
+        confirmPermission[OrderRole.SUPPLIER] = StatusAllowed(
             OrderStatus.SUPPLIED,
             OrderStatus.PENDING
         );
-        _roleUpdatePermission[MANUFACTURER_ROLE] = StatusAllowed(
+        confirmPermission[OrderRole.MANUFACTURER] = StatusAllowed(
             OrderStatus.DELIVERING,
             OrderStatus.SUPPLIED
-        );
-        _roleUpdatePermission[CUSTOMER_ROLE] = StatusAllowed(
-            OrderStatus.SUCCESS,
-            OrderStatus.DELIVERING
         );
         orderCounter = 1;
     }
@@ -120,18 +125,17 @@ contract SupplyChain is Roles {
         _;
     }
 
-    modifier onlyCustomer() {
+    modifier onlyCustomer(uint _orderId) {
         require(
-            roleContract.hasRole(CUSTOMER_ROLE, msg.sender),
+            roleContract.hasRole(roleContract.MEMBER_ROLE(), msg.sender),
+            "You are not a member"
+        );
+        require(
+            orderList[_orderId].customer == msg.sender,
             "You are not customer"
         );
         _;
     }
-
-    // modifier onlyCustomer{
-    //   require(roleContract.hasRole() == CUSTOMER_ROLE, "You are not customer");
-    //   _;
-    // }
 
     // Customer can create an order with certain informations
     function createOrder(
@@ -139,7 +143,7 @@ contract SupplyChain is Roles {
         address _customer,
         address[] memory _supplier,
         address[] memory _manufacturer
-    ) public onlyCustomer {
+    ) public onlyRole(roleContract.MEMBER_ROLE()) {
         Order memory newOrder = Order({
             id: orderCounter,
             productId: _productId,
@@ -167,7 +171,7 @@ contract SupplyChain is Roles {
         uint256 _orderId,
         address _account,
         uint256 price
-    ) public onlyCustomer {
+    ) public onlyCustomer(_orderId) {
         require(
             orderList[_orderId].customer == msg.sender,
             "You are not customer"
@@ -194,40 +198,16 @@ contract SupplyChain is Roles {
     ) public onlyStakeHolder(_orderId) {
         require(roleContract.hasRole(_role, msg.sender), "Role not granted");
         require(_orderId <= orderCounter, "Order ID is not valid");
+        Order memory order = orderList[_orderId];
         // Status changed corresponding to caller role
-        require(
-            _roleUpdatePermission[_role].prevStatus ==
-                orderList[_orderId].status,
-            "Current order status is not valid"
-        );
-        orderList[_orderId].status = _roleUpdatePermission[_role].statusSet;
-        emit OrderUpdated(
-            _orderId,
-            msg.sender,
-            _role,
-            _roleUpdatePermission[_role].prevStatus,
-            _roleUpdatePermission[_role].statusSet,
-            block.timestamp
-        );
-        // if (roleContract.hasRole(SUPPLIER_ROLE, msg.sender)) {
-        //     require(
-        //         orderList[_orderId].status == OrderStatus.PENDING,
-        //         "Order is not currently pending"
-        //     );
-        //     orderList[_orderId].status = OrderStatus.SUPPLIED;
-        // } else if (roleContract.hasRole(MANUFACTURER_ROLE, msg.sender)) {
-        //     require(
-        //         orderList[_orderId].status == OrderStatus.SUPPLIED,
-        //         "Order has not supplied"
-        //     );
-        //     orderList[_orderId].status = OrderStatus.DELIVERING;
-        // } else if (roleContract.hasRole(CUSTOMER_ROLE, msg.sender)) {
-        //     require(
-        //         orderList[_orderId].status == OrderStatus.DELIVERING,
-        //         "Order has not delivering"
-        //     );
-        //     orderList[_orderId].status = OrderStatus.SUCCESS;
-        // }
+        OrderRole[] storage callerRoles = getOrderRoles(_orderId, msg.sender);
+        for (uint i = 0; i < callerRoles.length; i++) {
+            if (confirmPermission[callerRoles[i]].prevStatus == order.status) {
+                orderList[_orderId].status = confirmPermission[callerRoles[i]]
+                    .statusSet;
+            }
+        }
+        emit OrderUpdated(_orderId, msg.sender, _role, block.timestamp);
     }
 
     // Get order by orderId
@@ -247,5 +227,35 @@ contract SupplyChain is Roles {
         OrderStatus prevStatus = orderList[_orderId].status;
         orderList[_orderId].status = OrderStatus.CANCELLED;
         emit OrderCancelled(_orderId, msg.sender, prevStatus, block.timestamp);
+    }
+
+    function getOrderRoles(
+        uint _orderId,
+        address _caller
+    ) private returns (OrderRole[] storage) {
+        require(_orderId <= orderCounter, "Order is not valid");
+        Order memory matchedOrder = orderList[_orderId]; // Need to check for potiential bug
+        OrderRole[] storage roles = initialOrderRole; // initialize roles to an empty array
+        address customer = matchedOrder.customer;
+        if (_caller == customer) {
+            roles.push(OrderRole.CUSTOMER);
+        }
+
+        address[] memory suppliers = matchedOrder.suppliers;
+        address[] memory manufacturers = matchedOrder.manufacturers;
+
+        for (uint i = 0; i < suppliers.length; i++) {
+            if (_caller == suppliers[i]) {
+                roles.push(OrderRole.SUPPLIER);
+                break;
+            }
+        }
+        for (uint i = 0; i < manufacturers.length; i++) {
+            if (_caller == manufacturers[i]) {
+                roles.push(OrderRole.MANUFACTURER);
+                break;
+            }
+        }
+        return roles;
     }
 }

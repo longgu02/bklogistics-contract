@@ -1,8 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0
 pragma solidity >=0.7.0 <0.9.0;
 
-import "./Roles.sol";
-
 contract Products {
     Roles private roleContract;
 
@@ -21,13 +19,20 @@ contract Products {
     event ProductAdded(
         uint256 productId,
         string name,
-        uint256 price,
-        uint256 quantity
+        address adder,
+        uint256 removeDate
     );
+
+    event ProductRemoved(
+        uint256 productId,
+        address remover,
+        uint256 removeDate
+    )
 
     /**
      * @dev Adds a new product to the system.
      * @param _name Name of the new product.
+     * emit event ProductAdded
      */
 
     function addProduct(
@@ -47,6 +52,7 @@ contract Products {
         );
         products[productCounter] = newProduct;
         productCounter++;
+        emit ProductAdded(newProduct.id, _name, msg.sender, block.timestamp)
     }
 
     /**
@@ -86,6 +92,7 @@ contract Products {
     /**
      * @dev Deletes a product given the product ID.
      * @param _productId ID of the product to be deleted.
+     * emit event ProductRemoved
      */
 
     function removeProduct(uint256 _productId) public {
@@ -94,6 +101,7 @@ contract Products {
             "Invalid product ID"
         );
         delete products[_productId - 1];
+        emit ProductRemoved(_productId, msg.sender, block.timestamp)
     }
 
     function _getProduct(Product[] memory _arr ,uint _productId) pure public returns(Product memory){
