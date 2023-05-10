@@ -2,9 +2,11 @@
 
 pragma solidity >=0.7.0 <0.9.0;
 
-// This contract defines roles for a supply chain management system.
-// It inherits from the OpenZeppelin AccessControl contract and uses its functions
-// to manage roles.
+/**
+ * @title Role management for Supply chain and shipment
+ * @author Pham Tuan Long - Group 13
+ * @notice Deploy address counted as default initial admin
+ */
 
 import "@openzeppelin/contracts/access/AccessControl.sol";
 

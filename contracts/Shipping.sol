@@ -3,53 +3,16 @@ pragma solidity ^0.8.0;
 
 import "@openzeppelin/contracts/access/AccessControl.sol";
 import "./Roles.sol";
+import "./interfaces/IShipping.sol";
 
-contract Shipping {
+/**
+ * @title Shipmnet logic
+ * @author Pham Tuan Long - Group 13
+ * @notice Shipping management logic | Require role CARRIER for shipping provider
+ */
+
+contract Shipping is IShipping {
     Roles public roleContract;
-
-    /**
-     * @dev Enum representing the status of a shipment.
-     */
-    enum ShippingStatus {
-        NOT_STARTED,
-        IN_PROGRESS,
-        DELIVERED
-    }
-
-    /**
-     * @dev Struct representing a shipment.
-     * @param id Unique identifier for the shipment.
-     * @param orderId Unique identifier for the order associated with the shipment.
-     * @param sender Address of the sender of the shipment.
-     * @param carrier Address of the carrier handling the shipment.
-     * @param receiver Address of the receiver of the shipment.
-     * @param pickupDate Date the shipment was picked up.
-     * @param deliveryDate Date the shipment was delivered.
-     * @param status Status of the shipment.
-     */
-
-    struct Shipment {
-        uint256 id;
-        uint256 orderId;
-        address sender;
-        address carrier;
-        address receiver;
-        uint256 pickupDate;
-        uint256 deliveryDate;
-        ShippingStatus status;
-    }
-
-    event ShippingOrderCreated(
-        Shipment orderDetails,
-        address creator,
-        uint256 createdDate
-    );
-
-    event ShippingOrderUpdated(
-        Shipment orderDetails,
-        address updater,
-        uint256 updatedDate
-    );
 
     /**
      * @dev Mapping of shipment IDs to Shipment structs.

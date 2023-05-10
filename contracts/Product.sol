@@ -1,6 +1,12 @@
 // SPDX-License-Identifier: GPL-3.0
 pragma solidity >=0.7.0 <0.9.0;
 
+/**
+ * @title Product storage
+ * @author Pham Tuan Long - Group 13
+ * @notice Required for orders in Supply Chain
+ */
+
 contract Products {
     Roles private roleContract;
 
