@@ -6,10 +6,10 @@ import "./Roles.sol";
 import "./Product.sol";
 import "./utils/Utils.sol";
 
-contract SupplyChain is Roles {
+contract SupplyChain is Roles, Utils {
     Roles private roleContract;
     Products private productContract;
-    Utils private utilityContract;
+    // Utils private utilityContract;
     address private admin;
 
     enum OrderStatus {
@@ -52,12 +52,7 @@ contract SupplyChain is Roles {
         uint256 cancelledDate
     );
 
-    event OrderUpdated(
-        uint id,
-        address updatedAddress,
-        bytes32 role,
-        uint256 updatedDate
-    );
+    event OrderUpdated(uint id, address updatedAddress, uint256 updatedDate);
 
     event OrderPaid(
         uint id,
@@ -79,21 +74,18 @@ contract SupplyChain is Roles {
         address[] manufacturers; // Manufacturer address
         uint256 createdDate; // Order created date
         OrderStatus status; // Order's status
-        bool paidStatus; // Payment status
+        bool isPaid; // Payment status
+        uint256 deposited; // Deposit status
     }
 
     mapping(uint => Order) orderList;
     mapping(uint => OrderPayment) paymentList; // Payment for order in orderList (corresponding id)
     uint orderCounter;
 
-    constructor(
-        address _roleContract,
-        address _productContract,
-        address _utilityContract
-    ) {
+    constructor(address _roleContract, address _productContract) {
         roleContract = Roles(_roleContract);
         productContract = Products(_productContract);
-        utilityContract = Utils(_utilityContract);
+        // utilityContract = Utils(_utilityContract);
         // admin for maintenance if needed (Based on government)
         admin = msg.sender;
         confirmPermission[OrderRole.CUSTOMER] = StatusAllowed(
@@ -114,7 +106,7 @@ contract SupplyChain is Roles {
     modifier onlyStakeHolder(uint256 _orderId) {
         Order storage matchedOrder = orderList[_orderId];
         require(
-            utilityContract.isStakeHolder(
+            isStakeHolder(
                 matchedOrder.suppliers,
                 matchedOrder.manufacturers,
                 matchedOrder.customer,
@@ -137,13 +129,57 @@ contract SupplyChain is Roles {
         _;
     }
 
+    function _checkRole(
+        bytes32 role,
+        address account
+    ) internal view virtual override {
+        if (!roleContract.hasRole(role, account)) {
+            revert(
+                string(
+                    abi.encodePacked(
+                        "AccessControl: account ",
+                        Strings.toHexString(account),
+                        " is missing role ",
+                        Strings.toHexString(uint256(role), 32)
+                    )
+                )
+            );
+        }
+    }
+
     // Customer can create an order with certain informations
+    /**
+     * @dev create an order
+     * @param _productId product id
+     * @param _customer customer address
+     * @param _supplier suppliers address array
+     * @param _manufacturer manufacturer address array
+     */
     function createOrder(
         uint256 _productId,
         address _customer,
         address[] memory _supplier,
         address[] memory _manufacturer
     ) public onlyRole(roleContract.MEMBER_ROLE()) {
+        // product id valid
+        // require(_productId <= productContract.productCounter(), "Product not exist");
+        // suppliers are member
+        for (uint i = 0; i < _supplier.length; i++) {
+            require(
+                roleContract.hasRole(roleContract.MEMBER_ROLE(), _supplier[i]),
+                "a supplier is not a member"
+            );
+        }
+        // manufacturers are member
+        for (uint i = 0; i < _manufacturer.length; i++) {
+            require(
+                roleContract.hasRole(
+                    roleContract.MEMBER_ROLE(),
+                    _manufacturer[i]
+                ),
+                "a manufacturer is not a member"
+            );
+        }
         Order memory newOrder = Order({
             id: orderCounter,
             productId: _productId,
@@ -152,7 +188,8 @@ contract SupplyChain is Roles {
             manufacturers: _manufacturer,
             createdDate: block.timestamp,
             status: OrderStatus.PENDING,
-            paidStatus: false
+            isPaid: false,
+            deposited: 0
         });
         emit OrderCreated(
             newOrder.id,
@@ -165,6 +202,7 @@ contract SupplyChain is Roles {
         );
         orderList[orderCounter] = newOrder;
         orderCounter++;
+        // Deposit 20%
     }
 
     function addPrice(
@@ -176,7 +214,7 @@ contract SupplyChain is Roles {
             orderList[_orderId].customer == msg.sender,
             "You are not customer"
         );
-        paymentList[_orderId].price[_account] = price;
+        paymentList[_orderId].price[_account] = price * 1 ether;
     }
 
     /**
@@ -192,32 +230,40 @@ contract SupplyChain is Roles {
      * Note: The confirmation must follow the confirming order of supply chain: Supplier -> Manufacturer -> Customer
      * Any other order is not allowed
      */
-    function confirmOrder(
-        uint256 _orderId,
-        bytes32 _role
-    ) public onlyStakeHolder(_orderId) {
-        require(roleContract.hasRole(_role, msg.sender), "Role not granted");
+    function confirmOrder(uint256 _orderId) public onlyStakeHolder(_orderId) {
+        require(
+            roleContract.hasRole(roleContract.MEMBER_ROLE(), msg.sender),
+            "Not a member"
+        );
         require(_orderId <= orderCounter, "Order ID is not valid");
         Order memory order = orderList[_orderId];
         // Status changed corresponding to caller role
-        OrderRole[] storage callerRoles = getOrderRoles(_orderId, msg.sender);
+        OrderRole[] storage callerRoles = _getOrderRoles(_orderId, msg.sender);
         for (uint i = 0; i < callerRoles.length; i++) {
             if (confirmPermission[callerRoles[i]].prevStatus == order.status) {
                 orderList[_orderId].status = confirmPermission[callerRoles[i]]
                     .statusSet;
             }
         }
-        emit OrderUpdated(_orderId, msg.sender, _role, block.timestamp);
+        emit OrderUpdated(_orderId, msg.sender, block.timestamp);
     }
 
-    // Get order by orderId
+    /**
+     * @dev retrive order's details
+     * @param _orderId order id
+     */
+
     function viewOrder(uint _orderId) public view returns (Order memory) {
         require(_orderId <= orderCounter, "Order ID is not valid");
         Order memory matchedOrder = orderList[_orderId];
         return matchedOrder;
     }
 
-    // Cancel the order
+    /**
+     * @dev Cancel the order when its status is not SUCCESS or FAILED
+     * @param _orderId order id
+     */
+
     function cancelOrder(uint _orderId) public {
         require(
             _orderId <= orderCounter &&
@@ -229,7 +275,12 @@ contract SupplyChain is Roles {
         emit OrderCancelled(_orderId, msg.sender, prevStatus, block.timestamp);
     }
 
-    function getOrderRoles(
+    /**
+     * @dev Check if the caller is order stakeholder and its role
+     * @param _orderId order id
+     * @param _caller the caller address
+     */
+    function _getOrderRoles(
         uint _orderId,
         address _caller
     ) private returns (OrderRole[] storage) {
@@ -257,5 +308,91 @@ contract SupplyChain is Roles {
             }
         }
         return roles;
+    }
+
+    /*========PAYMENT==========*/
+
+    /**
+     * @dev Get total price customer need to pay of an order
+     * @param _orderId  order id
+     */
+
+    function getTotalPrice(uint _orderId) public view returns (uint256) {
+        require(_orderId < orderCounter, "No order found");
+        uint256 totalPrice = 0;
+        Order storage matchedOrder = orderList[_orderId];
+        OrderPayment storage matchedOrderPrice = paymentList[_orderId];
+        for (uint i = 0; i < matchedOrder.suppliers.length; i++) {
+            totalPrice += matchedOrderPrice.price[matchedOrder.suppliers[i]];
+        }
+        for (uint i = 0; i < matchedOrder.manufacturers.length; i++) {
+            totalPrice += matchedOrderPrice.price[
+                matchedOrder.manufacturers[i]
+            ];
+        }
+        return totalPrice;
+    }
+
+    /**
+     * @dev Order deposit for customer (20% of total price)
+     * @param _orderId order id
+     */
+
+    function deposit(uint _orderId) public payable onlyCustomer(_orderId) {
+        require(_orderId < orderCounter, "No order found");
+        uint256 totalPrice = getTotalPrice(_orderId);
+        uint256 depositAmount = totalPrice / 5; // Deposit 20% of total price
+        require(msg.value >= depositAmount, "Not enough deposit amount");
+        orderList[_orderId].deposited = msg.value;
+    }
+
+    /**
+     * @dev Pay order for customer
+     * @param _orderId order id
+     */
+
+    function payOrder(uint _orderId) public payable onlyCustomer(_orderId) {
+        require(_orderId < orderCounter, "No order found");
+        uint256 totalPrice = getTotalPrice(_orderId);
+        uint256 payAmount = totalPrice - orderList[_orderId].deposited; // Deposit 20% of total price
+        require(msg.value >= payAmount, "Not enough");
+        orderList[_orderId].isPaid = true;
+        confirmOrder(_orderId);
+        _paySteakHolders(_orderId);
+    }
+
+    /**
+     * @dev Pay order's stakeholders with corresponding amount
+     * @param _orderId order id
+     */
+    function _paySteakHolders(
+        uint _orderId
+    ) public payable onlyCustomer(_orderId) {
+        require(orderList[_orderId].isPaid, "Order is not paid");
+        require(
+            orderList[_orderId].status == OrderStatus.SUCCESS,
+            "Order is not confirmed"
+        );
+        Order memory matchedOrder = orderList[_orderId];
+        for (uint i = 0; i < matchedOrder.suppliers.length; i++) {
+            _transferFunds(
+                payable(matchedOrder.suppliers[i]),
+                paymentList[_orderId].price[matchedOrder.suppliers[i]]
+            );
+        }
+        for (uint i = 0; i < matchedOrder.manufacturers.length; i++) {
+            _transferFunds(
+                payable(matchedOrder.manufacturers[i]),
+                paymentList[_orderId].price[matchedOrder.manufacturers[i]]
+            );
+        }
+    }
+
+    /**
+     * Transfer function for contract
+     */
+    function _transferFunds(address payable _to, uint _amount) private {
+        require(address(this).balance >= _amount, "Insufficient balance");
+        _to.transfer(_amount);
     }
 }

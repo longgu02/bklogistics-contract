@@ -10,7 +10,7 @@ contract Products {
     }
 
     mapping(uint => Product) products; // Mapping of product ID to product details
-    uint private productCounter; // Counter for total number of products added to the system
+    uint public productCounter; // Counter for total number of products added to the system
 
     constructor(address _roleContract) {
         roleContract = Roles(_roleContract);
