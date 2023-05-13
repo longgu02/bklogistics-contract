@@ -91,11 +91,30 @@ interface IShipping {
     ) external;
 
     /**
-     * @dev Returns the details of a specific shipment.
+     * @dev Returns the shipment details for the given shipment ID.
      * @param _shipmentId The ID of the shipment to retrieve.
-     * @return The details of the specified shipment.
+     * @return id The ID of the shipment.
+     * @return orderId The ID of the order associated with the shipment.
+     * @return sender The address of the sender who initiated the shipment.
+     * @return carrier The address of the carrier responsible for transporting the shipment.
+     * @return receiver The address of the recipient who will receive the shipment.
+     * @return pickupDate The date when the shipment was picked up by the carrier.
+     * @return deliveryDate The date when the shipment was delivered to the recipient.
+     * @return status The current status of the shipment.
      */
-    // function viewShipment(
-    //     uint256 _shipmentId
-    // ) external view returns (Shipment memory);
+    function viewShipment(
+        uint256 _shipmentId
+    )
+        external
+        view
+        returns (
+            uint256 id,
+            uint256 orderId,
+            address sender,
+            address carrier,
+            address receiver,
+            uint256 pickupDate,
+            uint256 deliveryDate,
+            ShippingStatus status
+        );
 }

@@ -94,4 +94,33 @@ contract Shipping is IShipping {
         shipment.deliveryDate = _deliveryDate;
         shipment.status = _status;
     }
+
+    function viewShipment(
+        uint256 _shipmentId
+    )
+        external
+        view
+        returns (
+            uint256 id,
+            uint256 orderId,
+            address sender,
+            address carrier,
+            address receiver,
+            uint256 pickupDate,
+            uint256 deliveryDate,
+            ShippingStatus status
+        )
+    {
+        Shipment memory matchedShip = shipmentList[_shipmentId];
+        return (
+            matchedShip.id,
+            matchedShip.orderId,
+            matchedShip.sender,
+            matchedShip.carrier,
+            matchedShip.receiver,
+            matchedShip.pickupDate,
+            matchedShip.deliveryDate,
+            matchedShip.status
+        );
+    }
 }

@@ -169,7 +169,7 @@ contract SupplyChain is ISupplyChain, Roles, Utils {
             orderList[_orderId].customer == msg.sender,
             "You are not customer"
         );
-        paymentList[_orderId].price[_account] = price * 1 ether;
+        paymentList[_orderId].price[_account] = price * 1 wei;
     }
 
     /**
@@ -191,6 +191,7 @@ contract SupplyChain is ISupplyChain, Roles, Utils {
             "Not a member"
         );
         require(_orderId <= orderCounter, "Order ID is not valid");
+        bool confirmed = false;
         Order memory order = orderList[_orderId];
         // Status changed corresponding to caller role
         OrderRole[] storage callerRoles = _getOrderRoles(_orderId, msg.sender);
@@ -198,9 +199,14 @@ contract SupplyChain is ISupplyChain, Roles, Utils {
             if (confirmPermission[callerRoles[i]].prevStatus == order.status) {
                 orderList[_orderId].status = confirmPermission[callerRoles[i]]
                     .statusSet;
+                confirmed = true;
             }
         }
-        emit OrderUpdated(_orderId, msg.sender, block.timestamp);
+        if (confirmed) {
+            emit OrderUpdated(_orderId, msg.sender, block.timestamp);
+        } else {
+            revert("Not your turn to confirm");
+        }
     }
 
     /**
