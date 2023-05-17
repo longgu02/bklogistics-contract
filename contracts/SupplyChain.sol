@@ -13,7 +13,7 @@ import "./interfaces/ISupplyChain.sol";
  * @notice Only addresses with MEMBER role can interact
  */
 
-contract SupplyChain is ISupplyChain, Roles, Utils {
+contract SupplyChain is ISupplyChain ,Roles, Utils {
     Roles private roleContract;
     Products private productContract;
     // Utils private utilityContract;
@@ -199,12 +199,12 @@ contract SupplyChain is ISupplyChain, Roles, Utils {
             if (confirmPermission[callerRoles[i]].prevStatus == order.status) {
                 orderList[_orderId].status = confirmPermission[callerRoles[i]]
                     .statusSet;
-                confirmed = true;
+                    confirmed = true;
             }
         }
-        if (confirmed) {
+        if(confirmed){
             emit OrderUpdated(_orderId, msg.sender, block.timestamp);
-        } else {
+        }else{
             revert("Not your turn to confirm");
         }
     }
@@ -214,23 +214,17 @@ contract SupplyChain is ISupplyChain, Roles, Utils {
      * @param _orderId order id
      */
 
-    function viewOrder(
-        uint _orderId
-    )
-        public
-        view
-        returns (
-            uint256 id,
-            uint256 productId,
-            address customer,
-            address[] memory suppliers,
-            address[] memory manufacturers,
-            uint256 createdDate,
-            OrderStatus status,
-            bool isPaid,
-            uint256 deposited
-        )
-    {
+    function viewOrder(uint _orderId) public view returns (
+        uint256 id,
+        uint256 productId,
+        address customer,
+        address[] memory suppliers,
+        address[] memory manufacturers,
+        uint256 createdDate, 
+        OrderStatus status, 
+        bool isPaid,
+        uint256 deposited
+    ) {
         require(_orderId <= orderCounter, "Order ID is not valid");
         Order memory matchedOrder = orderList[_orderId];
         return (
@@ -239,8 +233,8 @@ contract SupplyChain is ISupplyChain, Roles, Utils {
             matchedOrder.customer,
             matchedOrder.suppliers,
             matchedOrder.manufacturers,
-            matchedOrder.createdDate,
-            matchedOrder.status,
+            matchedOrder.createdDate, 
+            matchedOrder.status, 
             matchedOrder.isPaid,
             matchedOrder.deposited
         );

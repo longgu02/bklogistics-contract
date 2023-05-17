@@ -27,6 +27,8 @@ contract Roles is AccessControl {
 
     event MemberAdded(address account, uint256 addedDate); // Member addition
     event MemberRemoved(address account, uint256 removedDate); // Member removal
+    event CarrierAdded(address account, uint256 addedDate); // Carrier addition
+    event CarrierRemoved(address account, uint256 removedDate); // Carrier removal
 
     function addMember(address _account) public onlyRole(ADMIN_ROLE) {
         require(!hasRole(MEMBER_ROLE, _account), "Already a member");
@@ -53,6 +55,13 @@ contract Roles is AccessControl {
 
     function addCarrier(address _account) public onlyRole(ADMIN_ROLE) {
         grantRole(CARRIER_ROLE, _account);
+        emit CarrierAdded(_account, block.timestamp);
+    }
+
+    function removeCarrier(address _account) public onlyRole(ADMIN_ROLE) {
+        require(hasRole(CARRIER_ROLE, _account), "Not a carrier");
+        revokeRole(CARRIER_ROLE, _account);
+        emit CarrierRemoved(_account, block.timestamp);
     }
 
     /**
@@ -62,5 +71,6 @@ contract Roles is AccessControl {
      */
     function renounceCarrier(address _account) public onlyRole(CARRIER_ROLE) {
         renounceRole(CARRIER_ROLE, _account);
+        emit CarrierRemoved(_account, block.timestamp);
     }
 }

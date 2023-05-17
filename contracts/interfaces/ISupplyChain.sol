@@ -67,15 +67,13 @@ interface ISupplyChain {
      * @dev Event emitted when an order is paid.
      * @param id The ID of the order.
      * @param payer The address of the user who made the payment.
-     * @param receivers An array of addresses representing the users who will receive the payment.
-     * @param amount An array of uint256 values representing the amounts to be paid to each receiver.
+     * @param amount The remaining amount not includes deposit.
      * @param paymentDate The timestamp when the payment was made.
      */
     event OrderPaid(
         uint id,
         address payer,
-        address[] receivers,
-        uint256[] amount,
+        uint256 amount,
         uint256 paymentDate
     );
 
