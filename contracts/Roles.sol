@@ -42,7 +42,7 @@ contract Roles is AccessControl {
         emit MemberRemoved(_account, block.timestamp);
     }
 
-    function renounce(address _account) public onlyRole(MEMBER_ROLE) {
+    function renounceMember(address _account) public onlyRole(MEMBER_ROLE) {
         renounceRole(MEMBER_ROLE, _account);
         emit MemberRemoved(_account, block.timestamp);
     }
