@@ -115,7 +115,7 @@ contract SupplyChain is ISupplyChain, Roles, Utils {
         address _customer,
         address[] memory _supplier,
         address[] memory _manufacturer
-    ) public onlyRole(roleContract.MEMBER_ROLE()) {
+    ) public onlyRole(roleContract.MEMBER_ROLE()) returns (bool) {
         // product id valid
         // require(_productId <= productContract.productCounter(), "Product not exist");
         // suppliers are member
@@ -158,6 +158,7 @@ contract SupplyChain is ISupplyChain, Roles, Utils {
         orderList[orderCounter] = newOrder;
         orderCounter++;
         // Deposit 20%
+        return true;
     }
 
     function addPrice(

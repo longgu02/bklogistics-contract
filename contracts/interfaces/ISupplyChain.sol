@@ -105,7 +105,7 @@ interface ISupplyChain {
         address _customer,
         address[] memory _supplier,
         address[] memory _manufacturer
-    ) external;
+    ) external returns (bool);
 
     /**
      *@dev Add a price for a specific account to the payment list of an order.
