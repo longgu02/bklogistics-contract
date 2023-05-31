@@ -3,8 +3,9 @@
 pragma solidity >=0.7.0 <0.9.0;
 
 import "@openzeppelin/contracts/token/ERC721/extensions/ERC721URIStorage.sol";
+import "@openzeppelin/contracts/token/ERC721/IERC721.sol";
 
-contract BKLogisticsSBT is ERC721URIStorage {
+contract BKLogisticsSBT is IERC721, ERC721URIStorage {
     address owner;
 
     constructor() ERC721("BKLogisticsSBT", "BKLSBT") {

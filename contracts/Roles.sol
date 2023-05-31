@@ -30,6 +30,16 @@ contract Roles is AccessControl {
     event CarrierAdded(address account, uint256 addedDate); // Carrier addition
     event CarrierRemoved(address account, uint256 removedDate); // Carrier removal
 
+    function isMember(address _account) public view returns (bool) {
+        bool result = hasRole(MEMBER_ROLE, _account);
+        return result;
+    }
+
+    function isCarrier(address _account) public view returns (bool) {
+        bool result = hasRole(CARRIER_ROLE, _account);
+        return result;
+    }
+
     function addMember(address _account) public onlyRole(ADMIN_ROLE) {
         require(!hasRole(MEMBER_ROLE, _account), "Already a member");
         grantRole(MEMBER_ROLE, _account);
