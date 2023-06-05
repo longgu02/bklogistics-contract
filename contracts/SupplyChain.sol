@@ -25,6 +25,8 @@ contract SupplyChain is ISupplyChain, Roles, Utils {
         CUSTOMER
     }
 
+    mapping(uint => mapping(address => bool)) orderSignature;
+
     mapping(OrderRole => StatusAllowed) public confirmPermission;
     OrderRole[] private initialOrderRole = new OrderRole[](0);
 
@@ -43,18 +45,18 @@ contract SupplyChain is ISupplyChain, Roles, Utils {
         // utilityContract = Utils(_utilityContract);
         // admin for maintenance if needed (Based on government)
         admin = msg.sender;
-        confirmPermission[OrderRole.CUSTOMER] = StatusAllowed(
-            OrderStatus.SUCCESS,
-            OrderStatus.DELIVERING
-        );
-        confirmPermission[OrderRole.SUPPLIER] = StatusAllowed(
-            OrderStatus.SUPPLIED,
-            OrderStatus.PENDING
-        );
-        confirmPermission[OrderRole.MANUFACTURER] = StatusAllowed(
-            OrderStatus.DELIVERING,
-            OrderStatus.SUPPLIED
-        );
+        // confirmPermission[OrderRole.CUSTOMER] = StatusAllowed(
+        //     OrderStatus.SUCCESS,
+        //     OrderStatus.DELIVERING
+        // );
+        // confirmPermission[OrderRole.SUPPLIER] = StatusAllowed(
+        //     OrderStatus.SUPPLIED,
+        //     OrderStatus.PENDING
+        // );
+        // confirmPermission[OrderRole.MANUFACTURER] = StatusAllowed(
+        //     OrderStatus.DELIVERING,
+        //     OrderStatus.SUPPLIED
+        // );
         orderCounter = 1;
     }
 
@@ -144,7 +146,8 @@ contract SupplyChain is ISupplyChain, Roles, Utils {
             createdDate: block.timestamp,
             status: OrderStatus.PENDING,
             isPaid: false,
-            deposited: 0
+            deposited: 0,
+            numberOfSigned: 0
         });
         emit OrderCreated(
             newOrder.id,
@@ -192,22 +195,42 @@ contract SupplyChain is ISupplyChain, Roles, Utils {
             "Not a member"
         );
         require(_orderId <= orderCounter, "Order ID is not valid");
-        bool confirmed = false;
-        Order memory order = orderList[_orderId];
-        // Status changed corresponding to caller role
-        OrderRole[] storage callerRoles = _getOrderRoles(_orderId, msg.sender);
-        for (uint i = 0; i < callerRoles.length; i++) {
-            if (confirmPermission[callerRoles[i]].prevStatus == order.status) {
-                orderList[_orderId].status = confirmPermission[callerRoles[i]]
-                    .statusSet;
-                confirmed = true;
-            }
+        require(
+            orderSignature[_orderId][msg.sender] = true,
+            "You have already signed"
+        );
+        if (orderList[_orderId].customer == msg.sender) {
+            require(
+                orderList[_orderId].isPaid == true,
+                "You need to pay the order"
+            );
         }
-        if (confirmed) {
-            emit OrderUpdated(_orderId, msg.sender, block.timestamp);
-        } else {
-            revert("Not your turn to confirm");
+        orderSignature[_orderId][msg.sender] = true;
+        orderList[_orderId].numberOfSigned++;
+        uint numberOfManufacturers = orderList[_orderId].manufacturers.length;
+        uint numberOfSuppliers = orderList[_orderId].suppliers.length;
+        if (
+            orderList[_orderId].numberOfSigned ==
+            numberOfManufacturers + numberOfSuppliers + 1
+        ) {
+            orderList[_orderId].status = OrderStatus.SUCCESS;
         }
+        // bool confirmed = false;
+        // Order memory order = orderList[_orderId];
+        // // Status changed corresponding to caller role
+        // OrderRole[] storage callerRoles = _getOrderRoles(_orderId, msg.sender);
+        // for (uint i = 0; i < callerRoles.length; i++) {
+        //     if (confirmPermission[callerRoles[i]].prevStatus == order.status) {
+        //         orderList[_orderId].status = confirmPermission[callerRoles[i]]
+        //             .statusSet;
+        //         confirmed = true;
+        //     }
+        // }
+        // if (confirmed) {
+        //     emit OrderUpdated(_orderId, msg.sender, block.timestamp);
+        // } else {
+        //     revert("Not your turn to confirm");
+        // }
     }
 
     /**
@@ -332,6 +355,7 @@ contract SupplyChain is ISupplyChain, Roles, Utils {
         uint256 depositAmount = totalPrice / 5; // Deposit 20% of total price
         require(msg.value >= depositAmount, "Not enough deposit amount");
         orderList[_orderId].deposited = msg.value;
+        orderList[_orderId].status = OrderStatus.IN_PROGRESS;
     }
 
     /**

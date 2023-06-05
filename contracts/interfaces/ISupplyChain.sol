@@ -12,8 +12,9 @@ interface ISupplyChain {
      */
     enum OrderStatus {
         PENDING, // Recently created
-        SUPPLIED, // Supplier finished
-        DELIVERING, // Manufacturer finished
+        // SUPPLIED, // Supplier finished
+        // DELIVERING, // Manufacturer finished
+        IN_PROGRESS,
         SUCCESS, // Customer received
         FAILED, // Customer rejected or order stay up for too long
         CANCELLED // Order cancelled
@@ -91,6 +92,7 @@ interface ISupplyChain {
         OrderStatus status; // Order's status
         bool isPaid; // Payment status
         uint256 deposited; // Deposit status
+        uint numberOfSigned;
     }
 
     /**
