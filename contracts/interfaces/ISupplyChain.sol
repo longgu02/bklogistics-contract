@@ -11,10 +11,8 @@ interface ISupplyChain {
      * @dev Enum representing the status of an order.
      */
     enum OrderStatus {
-        PENDING, // Recently created
-        // SUPPLIED, // Supplier finished
-        // DELIVERING, // Manufacturer finished
-        IN_PROGRESS,
+        PENDING, // Recently created, before add price => no confirm no action
+        IN_PROGRESS, // Deposited, added price
         SUCCESS, // Customer received
         FAILED, // Customer rejected or order stay up for too long
         CANCELLED // Order cancelled

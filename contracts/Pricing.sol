@@ -3,27 +3,53 @@
 pragma solidity >=0.7.0 <0.9.0;
 
 import "./Roles.sol";
+import "./Products.sol";
 
-contract Pricing {
+contract Pricing is Roles {
     Roles roleContract;
+    Products productContract;
+
+    enum Unit {
+        NONE,
+        KILOGRAM,
+        METER,
+        LITTER
+    }
+
+    struct PartialPrice {
+        uint price;
+        Unit unit;
+    }
 
     struct Price {
-        uint unit;
-        uint manufacturePrice;
-        uint supplyPrice;
-        bool isInit;
+        PartialPrice manufacturePrice;
+        PartialPrice supplyPrice;
+    }
+
+    struct MemberPricing {
+        mapping(uint => Price) productPrice;
     }
 
     enum PriceType {
         SUPPLY,
         MANUFACTURE
     }
-    mapping(address => Price) memberPricing;
+
+    event PriceUpdated(
+        address updater,
+        uint productId,
+        PriceType priceType,
+        uint price,
+        Unit unit
+    );
+
+    mapping(address => MemberPricing) memberPricing;
     address private roleContractAddress;
 
-    constructor(address _roleContractAddress) {
+    constructor(address _roleContractAddress, address _productContractAddress) {
         roleContract = Roles(_roleContractAddress);
         roleContractAddress = _roleContractAddress;
+        productContract = Products(_productContractAddress);
     }
 
     modifier onlyRoleContract() {
@@ -31,27 +57,60 @@ contract Pricing {
         _;
     }
 
-    function modifyPrice(uint _price, PriceType _type) public {
+    function modifyPrice(
+        uint productId,
+        uint _price,
+        uint8 _type,
+        Unit _unit
+    ) public {
+        PriceType priceType = PriceType(_type);
         require(
-            _type == PriceType.SUPPLY || _type == PriceType.MANUFACTURE,
+            priceType == PriceType.SUPPLY || priceType == PriceType.MANUFACTURE,
             "Please specify price type of manufacture or supply"
         );
-        if (_type == PriceType.SUPPLY) {
-            memberPricing[msg.sender].supplyPrice = _price;
-        } else if (_type == PriceType.MANUFACTURE) {
-            memberPricing[msg.sender].manufacturePrice = _price;
+        require(
+            productId < productContract.productCounter(),
+            "Product not found"
+        );
+        PartialPrice memory newPrice = PartialPrice({
+            price: _price * 1 wei,
+            unit: _unit
+        });
+        if (priceType == PriceType.SUPPLY) {
+            memberPricing[msg.sender]
+                .productPrice[productId]
+                .supplyPrice = newPrice;
+        } else if (priceType == PriceType.MANUFACTURE) {
+            memberPricing[msg.sender]
+                .productPrice[productId]
+                .manufacturePrice = newPrice;
         }
+        emit PriceUpdated(msg.sender, productId, priceType, _price, _unit);
         return;
     }
 
-    function initial(address _account) external onlyRoleContract {
-        require(
-            memberPricing[_account].isInit == false,
-            "The address already initialized"
-        );
-        memberPricing[_account].isInit == true;
-        memberPricing[_account].manufacturePrice == 0;
-        memberPricing[_account].supplyPrice == 0;
-        return;
+    function getPrice(
+        address _account,
+        uint _productId,
+        PriceType _type
+    ) public view returns (uint productId, uint price, Unit unit) {
+        Price memory matchedPricing = memberPricing[_account].productPrice[
+            _productId
+        ];
+        if (_type == PriceType.MANUFACTURE) {
+            return (
+                _productId,
+                matchedPricing.manufacturePrice.price,
+                matchedPricing.manufacturePrice.unit
+            );
+        } else if (_type == PriceType.SUPPLY) {
+            return (
+                _productId,
+                matchedPricing.supplyPrice.price,
+                matchedPricing.supplyPrice.unit
+            );
+        } else {
+            revert("Unknown type");
+        }
     }
 }

@@ -52,17 +52,17 @@ contract Products {
     /**
      * @dev Gets the details of a product given the product ID.
      * @param _productId ID of the product to be retrieved.
-     * @return Product details of the product with the given ID.
+     * @return productName Product details of the product with the given ID.
      */
 
     function getProduct(
         uint256 _productId
-    ) public view returns (Product memory) {
+    ) public view returns (string memory productName) {
         require(
             _productId > 0 && _productId <= productCounter,
             "Invalid product ID"
         );
-        return products[_productId - 1];
+        return products[_productId - 1].name;
     }
 
     /**
