@@ -1,7 +1,8 @@
 import { loadFixture } from "@nomicfoundation/hardhat-network-helpers";
 import "@nomicfoundation/hardhat-chai-matchers"; //Added for revertWithCustomErrors
 import { expect } from "chai";
-import { BigNumber, constants } from "ethers";
+import { constants, ethers } from "ethers";
+import BigNumber from "bignumber.js";
 import hre from "hardhat";
 
 export const ADMIN_ROLE =
@@ -26,6 +27,9 @@ describe("Pricing", function () {
 		const product = await Product.deploy();
 		await product.deployed();
 
+		await product.addProduct("test1");
+		await product.addProduct("test2");
+
 		const Pricing = await hre.ethers.getContractFactory("Pricing");
 		const pricing = await Pricing.deploy(role.address, product.address);
 		await pricing.deployed();
@@ -36,17 +40,26 @@ describe("Pricing", function () {
 	describe("Pricing", function () {
 		it("Should add pricing for member", async function () {
 			const { owner, otherAccount, pricing } = await loadFixture(deploy);
-			expect(
-				await otherAccount.call(pricing.modifyPrice(1, 1000000000, 1, 0))
-			).to.emit(pricing, "PriceUpdated");
+			expect(await otherAccount.call(pricing.modifyPrice(1, 1000000000, 1, 0)))
+				.to.emit(pricing, "PriceUpdated")
+				.withArgs(otherAccount.address, 1, 1, 1000000000, 0);
+			//       await expect(lock.withdraw())
+			//         .to.emit(lock, "Withdrawal")
+			//         .withArgs(lockedAmount, anyValue); // We accept any value as `when` arg
+			//     });
 		});
 		it("Member should have pricing updated", async function () {
 			const { owner, otherAccount, pricing } = await loadFixture(deploy);
-			await otherAccount.call(pricing.modifyPrice(1, 1000000000, 0, 0));
-			const result = await pricing.getPrice(otherAccount.address, 1, 1);
+			const tx = await pricing.modifyPrice(1, 100000000000, 1, 0);
+			// console.log("tx ", tx);
+			const result = await pricing.getPrice(owner.address, 1, 1);
 			console.log(result);
-			expect(await pricing.getPrice(otherAccount.address, 1, 1)).to.equal([
-				1, 1000000000, 0,
+			// let price = new BigNumber(result[1]);
+			console.log(ethers.utils.formatEther(result[1]));
+			expect(await pricing.getPrice(owner.address, 1, 1)).to.equal([
+				new BigNumber(1),
+				new BigNumber(1000000000),
+				0,
 			]);
 		});
 	});

@@ -16,23 +16,20 @@ contract Pricing is Roles {
         LITTER
     }
 
-    struct PartialPrice {
+    struct Price {
         uint price;
         Unit unit;
-    }
-
-    struct Price {
-        PartialPrice manufacturePrice;
-        PartialPrice supplyPrice;
+        bool isListed;
     }
 
     struct MemberPricing {
         mapping(uint => Price) productPrice;
+        mapping(uint => Price) materialPrice;
     }
 
     enum PriceType {
-        SUPPLY,
-        MANUFACTURE
+        MATERIAL,
+        PRODUCT
     }
 
     event PriceUpdated(
@@ -58,56 +55,54 @@ contract Pricing is Roles {
     }
 
     function modifyPrice(
-        uint productId,
+        uint _id,
         uint _price,
+        bool _list,
         uint8 _type,
         Unit _unit
     ) public {
         PriceType priceType = PriceType(_type);
         require(
-            priceType == PriceType.SUPPLY || priceType == PriceType.MANUFACTURE,
+            priceType == PriceType.MATERIAL || priceType == PriceType.PRODUCT,
             "Please specify price type of manufacture or supply"
         );
-        require(
-            productId < productContract.productCounter(),
-            "Product not found"
-        );
-        PartialPrice memory newPrice = PartialPrice({
+        require(_id < productContract.productCounter(), "Product not found");
+        Price memory newPrice = Price({
             price: _price * 1 wei,
-            unit: _unit
+            unit: _unit,
+            isListed: _list
         });
-        if (priceType == PriceType.SUPPLY) {
-            memberPricing[msg.sender]
-                .productPrice[productId]
-                .supplyPrice = newPrice;
-        } else if (priceType == PriceType.MANUFACTURE) {
-            memberPricing[msg.sender]
-                .productPrice[productId]
-                .manufacturePrice = newPrice;
+        if (priceType == PriceType.MATERIAL) {
+            memberPricing[msg.sender].materialPrice[_id] = newPrice;
+        } else if (priceType == PriceType.PRODUCT) {
+            memberPricing[msg.sender].productPrice[_id] = newPrice;
         }
-        emit PriceUpdated(msg.sender, productId, priceType, _price, _unit);
+        emit PriceUpdated(msg.sender, _id, priceType, _price, _unit);
         return;
     }
 
     function getPrice(
         address _account,
-        uint _productId,
+        uint _id,
         PriceType _type
-    ) public view returns (uint productId, uint price, Unit unit) {
-        Price memory matchedPricing = memberPricing[_account].productPrice[
-            _productId
-        ];
-        if (_type == PriceType.MANUFACTURE) {
+    )
+        public
+        view
+        returns (uint productId, uint price, Unit unit, bool isListed)
+    {
+        if (_type == PriceType.PRODUCT) {
             return (
-                _productId,
-                matchedPricing.manufacturePrice.price,
-                matchedPricing.manufacturePrice.unit
+                _id,
+                memberPricing[_account].productPrice[_id].price,
+                memberPricing[_account].productPrice[_id].unit,
+                memberPricing[_account].productPrice[_id].isListed
             );
-        } else if (_type == PriceType.SUPPLY) {
+        } else if (_type == PriceType.MATERIAL) {
             return (
-                _productId,
-                matchedPricing.supplyPrice.price,
-                matchedPricing.supplyPrice.unit
+                _id,
+                memberPricing[_account].materialPrice[_id].price,
+                memberPricing[_account].materialPrice[_id].unit,
+                memberPricing[_account].materialPrice[_id].isListed
             );
         } else {
             revert("Unknown type");
