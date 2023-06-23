@@ -76,8 +76,14 @@ interface ISupplyChain {
         uint256 paymentDate
     );
 
+    struct OrderStakeHolderDetail {
+        uint productId;
+        uint quantity;
+    }
+
     struct OrderPayment {
         mapping(address => uint) price; // Money stakeholders received after finish the order
+        mapping(address => OrderStakeHolderDetail) detail; // Money stakeholders received after finish the order
     }
 
     struct Order {
@@ -105,23 +111,26 @@ interface ISupplyChain {
         address _customer,
         address[] memory _supplier,
         address[] memory _manufacturer
-    ) external returns (bool);
+    ) external;
 
     /**
-     *@dev Add a price for a specific account to the payment list of an order.
-     *@param _orderId The ID of the order to add the price to.
-     *@param _account The account to add the price for.
-     *@param price The price to add for the specified account, in ether.
-     *Requirements:
-     *The function must be called by the customer of the order.
-     *The specified order must exist.
-     *The specified account must be either a supplier or a manufacturer of the order.
+     * @dev Add prices for specific accounts to the payment list of an order.
+     * @param _orderId The ID of the order to add the prices to.
+     * @param _accounts The accounts to add the prices for.
+     * @param _productIds The product IDs corresponding to the prices.
+     * @param _prices The prices to add for the specified accounts, in ether.
+     * @param _qty The quantities of the products corresponding to the prices.
+     * Requirements:
+     * - The function must be called by the customer of the order.
+     * - The specified order must exist.
+     * - The specified accounts must be either suppliers or manufacturers of the order.
      */
-
     function addPrice(
         uint256 _orderId,
-        address _account,
-        uint256 price
+        address[] memory _accounts,
+        uint256[] memory _productIds,
+        uint256[] memory _prices,
+        uint256[] memory _qty
     ) external;
 
     /**

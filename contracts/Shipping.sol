@@ -3,6 +3,7 @@ pragma solidity ^0.8.0;
 
 import "@openzeppelin/contracts/access/AccessControl.sol";
 import "./Roles.sol";
+import "./SupplyChain.sol";
 import "./interfaces/IShipping.sol";
 
 /**
@@ -13,7 +14,7 @@ import "./interfaces/IShipping.sol";
 
 contract Shipping is IShipping {
     Roles public roleContract;
-
+    SupplyChain public supplyChainContract;
     /**
      * @dev Mapping of shipment IDs to Shipment structs.
      */
@@ -35,8 +36,12 @@ contract Shipping is IShipping {
         _;
     }
 
-    constructor(address _roleContractAddress) {
+    constructor(
+        address _roleContractAddress,
+        address _supplyChainContractAddress
+    ) {
         roleContract = Roles(_roleContractAddress);
+        supplyChainContract = SupplyChain(_supplyChainContractAddress);
         shipmentCounter = 1;
     }
 
@@ -56,7 +61,11 @@ contract Shipping is IShipping {
         address _carrier,
         address _receiver,
         uint256 _pickupDate
-    ) public onlyRole(roleContract.CARRIER_ROLE()) {
+    ) public onlyRole(roleContract.CARRIER_ROLE()) returns (uint) {
+        require(
+            _orderId <= supplyChainContract.orderCounter(),
+            "Order ID not valid"
+        );
         Shipment memory newShipment = Shipment({
             id: shipmentCounter,
             orderId: _orderId,
@@ -70,6 +79,7 @@ contract Shipping is IShipping {
         shipmentList[shipmentCounter] = newShipment;
         shipmentCounter++;
         emit ShippingOrderCreated(newShipment, msg.sender, block.timestamp);
+        return newShipment.id;
     }
 
     /**
@@ -86,14 +96,36 @@ contract Shipping is IShipping {
         ShippingStatus _status
     ) public onlyRole(roleContract.CARRIER_ROLE()) {
         require(_shipmentId < shipmentCounter, "Invalid shipment ID");
-        Shipment storage shipment = shipmentList[_shipmentId];
         require(
-            msg.sender == shipment.carrier,
+            msg.sender == shipmentList[_shipmentId].carrier,
             "Only carrier can update shipment status"
         );
-        shipment.deliveryDate = _deliveryDate;
-        shipment.status = _status;
+        shipmentList[_shipmentId].deliveryDate = _deliveryDate;
+        shipmentList[_shipmentId].status = _status;
+        emit ShippingOrderUpdated(
+            shipmentList[_shipmentId],
+            msg.sender,
+            block.timestamp
+        );
     }
+
+    function sign(uint256 _shipmentId) public {
+        require(_shipmentId < shipmentCounter, "Invalid shipment ID");
+        require(
+            msg.sender == shipmentList[_shipmentId].receiver,
+            "Only receiver can sign the shipment"
+        );
+        shipmentList[_shipmentId].status = ShippingStatus.DELIVERED;
+        emit ShippingOrderUpdated(
+            shipmentList[_shipmentId],
+            msg.sender,
+            block.timestamp
+        );
+    }
+
+    function shipmentOfOrder(
+        uint _orderId
+    ) public returns (uint[] memory orderIds) {}
 
     function viewShipment(
         uint256 _shipmentId

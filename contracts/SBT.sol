@@ -17,6 +17,7 @@ contract BKLogisticsSBT is ERC721URIStorage {
 
     uint256 counter = 0;
 
+    mapping(address => uint) public owned;
     mapping(address => bool) public issued;
 
     modifier onlyOwner() {
@@ -40,30 +41,14 @@ contract BKLogisticsSBT is ERC721URIStorage {
         );
     }
 
-    // function safeTransferFrom(
-    //     address from,
-    //     address to,
-    //     uint256 tokenId
-    // ) public virtual override(ERC721, IERC721) {
-    //     require(false, "Soulbound Token: Can't be transfered");
-    // }
-
-    // function safeTransferFrom(
-    //     address from,
-    //     address to,
-    //     uint256 tokenId,
-    //     bytes memory data
-    // ) public virtual override(ERC721, IERC721) {
-    //     require(false, "Soulbound Token: Can't be transfered");
-    // }
-
     function claimSBT(string memory tokenURI) public returns (uint256) {
         require(issued[msg.sender], "SBT is not issued");
+        require(owned[msg.sender] > 0, "Already claimed SBT!");
         counter++;
         uint newItemId = counter;
         _mint(msg.sender, newItemId);
         _setTokenURI(newItemId, tokenURI);
-
+        owned[msg.sender] = newItemId;
         issued[msg.sender] = false;
         emit Claim(newItemId, msg.sender, block.timestamp);
         return newItemId;
@@ -75,6 +60,11 @@ contract BKLogisticsSBT is ERC721URIStorage {
             _isApprovedOrOwner(_msgSender(), tokenId),
             "ERC721: caller is not token owner or approved"
         );
+        owned[msg.sender] = 0;
         _burn(tokenId);
+    }
+
+    function getSoulBoundFrom(address _account) public view returns (uint256) {
+        return owned[_account];
     }
 }

@@ -3,7 +3,7 @@
 pragma solidity >=0.7.0 <0.9.0;
 
 import "./Roles.sol";
-import "./Products.sol";
+import "./Product.sol";
 import "./utils/Utils.sol";
 import "./interfaces/ISupplyChain.sol";
 
@@ -36,27 +36,14 @@ contract SupplyChain is ISupplyChain, Roles, Utils {
     }
 
     mapping(uint => Order) orderList;
+    mapping(uint => uint) public totalPrice;
     mapping(uint => OrderPayment) paymentList; // Payment for order in orderList (corresponding id)
-    uint orderCounter;
+    uint public orderCounter;
 
     constructor(address _roleContract, address _productContract) {
         roleContract = Roles(_roleContract);
         productContract = Products(_productContract);
-        // utilityContract = Utils(_utilityContract);
-        // admin for maintenance if needed (Based on government)
         admin = msg.sender;
-        // confirmPermission[OrderRole.CUSTOMER] = StatusAllowed(
-        //     OrderStatus.SUCCESS,
-        //     OrderStatus.DELIVERING
-        // );
-        // confirmPermission[OrderRole.SUPPLIER] = StatusAllowed(
-        //     OrderStatus.SUPPLIED,
-        //     OrderStatus.PENDING
-        // );
-        // confirmPermission[OrderRole.MANUFACTURER] = StatusAllowed(
-        //     OrderStatus.DELIVERING,
-        //     OrderStatus.SUPPLIED
-        // );
         orderCounter = 1;
     }
 
@@ -117,7 +104,7 @@ contract SupplyChain is ISupplyChain, Roles, Utils {
         address _customer,
         address[] memory _supplier,
         address[] memory _manufacturer
-    ) public onlyRole(roleContract.MEMBER_ROLE()) returns (bool) {
+    ) public onlyRole(roleContract.MEMBER_ROLE()) {
         // product id valid
         // require(_productId <= productContract.productCounter(), "Product not exist");
         // suppliers are member
@@ -161,19 +148,30 @@ contract SupplyChain is ISupplyChain, Roles, Utils {
         orderList[orderCounter] = newOrder;
         orderCounter++;
         // Deposit 20%
-        return true;
     }
 
     function addPrice(
         uint256 _orderId,
-        address _account,
-        uint256 price
+        address[] memory _accounts,
+        uint256[] memory _productIds,
+        uint256[] memory _prices,
+        uint256[] memory _qty
     ) public onlyCustomer(_orderId) {
         require(
             orderList[_orderId].customer == msg.sender,
             "You are not customer"
         );
-        paymentList[_orderId].price[_account] = price * 1 wei;
+        for (uint i = 0; i < _accounts.length; i++) {
+            paymentList[_orderId].price[_accounts[i]] +=
+                _prices[i] *
+                _qty[i] *
+                1 wei;
+            paymentList[_orderId].detail[_accounts[i]].productId = _productIds[
+                i
+            ];
+            paymentList[_orderId].detail[_accounts[i]].quantity = _qty[i];
+            totalPrice[_orderId] += _prices[i] * _qty[i] * 1 wei;
+        }
     }
 
     /**
@@ -270,6 +268,18 @@ contract SupplyChain is ISupplyChain, Roles, Utils {
         );
     }
 
+    function viewOrderStakeholderDetail(
+        uint _orderId,
+        address _account
+    ) public view returns (uint productId, uint quantity, uint price) {
+        OrderPayment storage orderInvoice = paymentList[_orderId];
+        return (
+            orderInvoice.detail[_account].productId,
+            orderInvoice.detail[_account].quantity,
+            orderInvoice.price[_account]
+        );
+    }
+
     /**
      * @dev Cancel the order when its status is not SUCCESS or FAILED
      * @param _orderId order id
@@ -330,18 +340,7 @@ contract SupplyChain is ISupplyChain, Roles, Utils {
 
     function getTotalPrice(uint _orderId) public view returns (uint256) {
         require(_orderId < orderCounter, "No order found");
-        uint256 totalPrice = 0;
-        Order storage matchedOrder = orderList[_orderId];
-        OrderPayment storage matchedOrderPrice = paymentList[_orderId];
-        for (uint i = 0; i < matchedOrder.suppliers.length; i++) {
-            totalPrice += matchedOrderPrice.price[matchedOrder.suppliers[i]];
-        }
-        for (uint i = 0; i < matchedOrder.manufacturers.length; i++) {
-            totalPrice += matchedOrderPrice.price[
-                matchedOrder.manufacturers[i]
-            ];
-        }
-        return totalPrice;
+        return totalPrice[_orderId];
     }
 
     /**
@@ -351,8 +350,8 @@ contract SupplyChain is ISupplyChain, Roles, Utils {
 
     function deposit(uint _orderId) public payable onlyCustomer(_orderId) {
         require(_orderId < orderCounter, "No order found");
-        uint256 totalPrice = getTotalPrice(_orderId);
-        uint256 depositAmount = totalPrice / 5; // Deposit 20% of total price
+        uint256 total = totalPrice[_orderId];
+        uint256 depositAmount = total / 5; // Deposit 20% of total price
         require(msg.value >= depositAmount, "Not enough deposit amount");
         orderList[_orderId].deposited = msg.value;
         orderList[_orderId].status = OrderStatus.IN_PROGRESS;
@@ -365,8 +364,8 @@ contract SupplyChain is ISupplyChain, Roles, Utils {
 
     function payOrder(uint _orderId) public payable onlyCustomer(_orderId) {
         require(_orderId < orderCounter, "No order found");
-        uint256 totalPrice = getTotalPrice(_orderId);
-        uint256 payAmount = totalPrice - orderList[_orderId].deposited; // Deposit 20% of total price
+        uint256 total = totalPrice[_orderId];
+        uint256 payAmount = total - orderList[_orderId].deposited; // Deposit 20% of total price
         require(msg.value >= payAmount, "Not enough");
         orderList[_orderId].isPaid = true;
         confirmOrder(_orderId);

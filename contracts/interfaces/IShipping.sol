@@ -76,7 +76,7 @@ interface IShipping {
         address _carrier,
         address _receiver,
         uint256 _pickupDate
-    ) external;
+    ) external returns (uint);
 
     /**
      * @dev Updates an existing shipment.
